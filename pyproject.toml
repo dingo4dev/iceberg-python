@@ -16,8 +16,8 @@
 # under the License.
 
 [build-system]
-requires = [ "cython>=3.0.0", "setuptools>=61", "wheel",]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=1.0.0", "wheel", "Cython>=3.0.0", "setuptools"]
+build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "pyiceberg"
@@ -94,14 +94,32 @@ gcsfs = [ "gcsfs>=2023.1.0",]
 rest-sigv4 = [ "boto3>=1.24.59",]
 pyiceberg-core = [ "pyiceberg-core<1.0.0,>=0.4.0",]
 
-[tool.setuptools.packages.find]
-include = [ "pyiceberg*", "vendor/fb303*", "vendor/hive_metastore*",]
 
-[tool.setuptools.package-data]
-"*" = [ "*.so", "*.pyd", "*.pyx",]
+[tool.hatch.build.targets.wheel.sources]
+src = "pyiceberg"
+scripts = "setup.py"
 
-[tool.setuptools.exclude-package-data]
-pyiceberg = [ "*.pyc", "*.py",]
+[tool.poetry.build]
+generate-setup-file = false
+script = "build-module.py"
+
+[tool.poetry]
+packages = [
+  { include = "pyiceberg" },
+  { from = "vendor", include = "fb303" },
+  { from = "vendor", include = "hive_metastore" },
+  { include = "tests", format = "sdist" },
+  { include = "Makefile", format = "sdist" },
+  { include = "NOTICE", format = [
+    "sdist",
+    "wheel",
+  ] },
+]
+include = [
+  { path = "dev", format = "sdist" },
+  { path = "pyiceberg/**/*.so", format = "wheel" },
+  { path = "pyiceberg/**/*.pyd", format = "wheel" },
+]
 
 [tool.cibuildwheel.environment]
 CIBW_BUILD_FRONTEND = "build[uv]"
