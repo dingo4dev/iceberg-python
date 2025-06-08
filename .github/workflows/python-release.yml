@@ -97,20 +97,23 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Install Poetry
-        run: make install-poetry
+      - name: Install uv
+        run: make install-uv
+      
+      - name: Install pyproject-parser
+        run: uv tool install 'pyproject-parser[cli]'
 
       - name: Validate current pyiceberg version
         env:
           VERSION: ${{ needs.validate-inputs.outputs.VERSION }}
         run: |
-          # Extract the current version from Poetry
-          current_pyiceberg_version=$(poetry version --short)
-          echo "Detected Poetry version: $current_pyiceberg_version"
+          # Extract the current version from pyproject.toml
+          current_pyiceberg_version=$(pyproject-info project.version)
+          echo "Detected project version: $current_pyiceberg_version"
 
-          # Compare the input version with the Poetry version
+          # Compare the input version with the project version
           if [[ "$VERSION" != "$current_pyiceberg_version" ]]; then
-            echo "Error: Input version ($VERSION) does not match the Poetry version ($current_pyiceberg_version)"
+            echo "Error: Input version ($VERSION) does not match the project version ($current_pyiceberg_version)"
             exit 1
           fi
 
