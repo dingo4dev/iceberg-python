@@ -25,7 +25,7 @@ install-uv:  ## Ensure uv is installed and the correct version is being used.
 		echo "uv could not be found. Installing..."; \
 		pip install --user uv==$(UV_VERSION); \
 	else \
-		INSTALLED_VERSION=$$(uv --version | awk '{print $$2}'); \
+		INSTALLED_VERSION=$$(uv --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'); \
 		if [ "$$INSTALLED_VERSION" != "$(UV_VERSION)" ]; then \
 			echo "uv version $$INSTALLED_VERSION does not match required version $(UV_VERSION). Updating..."; \
 			pip install --user --upgrade uv==$(UV_VERSION); \
