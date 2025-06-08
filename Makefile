@@ -19,38 +19,38 @@
 help:  ## Display this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-POETRY_VERSION = 2.1.1
-install-poetry:  ## Ensure Poetry is installed and the correct version is being used.
-	@if ! command -v poetry &> /dev/null; then \
-		echo "Poetry could not be found. Installing..."; \
-		pip install --user poetry==$(POETRY_VERSION); \
+UV_VERSION = 0.6.16
+install-uv:  ## Ensure uv is installed and the correct version is being used.
+	@if ! command -v uv &> /dev/null; then \
+		echo "uv could not be found. Installing..."; \
+		pip install --user uv==$(UV_VERSION); \
 	else \
-		INSTALLED_VERSION=$$(pip show poetry | grep Version | awk '{print $$2}'); \
-		if [ "$$INSTALLED_VERSION" != "$(POETRY_VERSION)" ]; then \
-			echo "Poetry version $$INSTALLED_VERSION does not match required version $(POETRY_VERSION). Updating..."; \
-			pip install --user --upgrade poetry==$(POETRY_VERSION); \
+		INSTALLED_VERSION=$$(uv --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'); \
+		if [ "$$INSTALLED_VERSION" != "$(UV_VERSION)" ]; then \
+			echo "uv version $$INSTALLED_VERSION does not match required version $(UV_VERSION). Updating..."; \
+			pip install --user --upgrade uv==$(UV_VERSION); \
 		else \
-			echo "Poetry version $$INSTALLED_VERSION is already installed."; \
+			echo "uv version $$INSTALLED_VERSION is already installed."; \
 		fi \
 	fi
 
 install-dependencies: ## Install dependencies including dev, docs, and all extras
-	poetry install --all-extras
+	uv sync --all-extras --dev
 
-install: | install-poetry install-dependencies
+install: | install-uv install-dependencies
 
 check-license: ## Check license headers
 	./dev/check-license
 
 lint: ## lint
-	poetry run pre-commit run --all-files
+	uv run pre-commit run --all-files
 
 test: ## Run all unit tests, can add arguments with PYTEST_ARGS="-vv"
-	poetry run pytest tests/ -m "(unmarked or parametrize) and not integration" ${PYTEST_ARGS}
+	uv run pytest tests/ -m "(unmarked or parametrize) and not integration" ${PYTEST_ARGS}
 
 test-s3: # Run tests marked with s3, can add arguments with PYTEST_ARGS="-vv"
 	sh ./dev/run-minio.sh
-	poetry run pytest tests/ -m s3 ${PYTEST_ARGS}
+	uv run pytest tests/ -m s3 ${PYTEST_ARGS}
 
 test-integration: | test-integration-setup test-integration-exec ## Run all integration tests, can add arguments with PYTEST_ARGS="-vv"
 
@@ -63,7 +63,7 @@ test-integration-setup: # Prepare the environment for integration
 	docker compose -f dev/docker-compose-integration.yml exec -T spark-iceberg ipython ./provision.py
 
 test-integration-exec:  # Execute integration tests, can add arguments with PYTEST_ARGS="-vv"
-	poetry run pytest tests/ -v -m integration ${PYTEST_ARGS}
+	uv run pytest tests/ -v -m integration ${PYTEST_ARGS}
 
 test-integration-rebuild:
 	docker compose -f dev/docker-compose-integration.yml kill
@@ -72,14 +72,14 @@ test-integration-rebuild:
 
 test-adls: ## Run tests marked with adls, can add arguments with PYTEST_ARGS="-vv"
 	sh ./dev/run-azurite.sh
-	poetry run pytest tests/ -m adls ${PYTEST_ARGS}
+	uv run pytest tests/ -m adls ${PYTEST_ARGS}
 
 test-gcs: ## Run tests marked with gcs, can add arguments with PYTEST_ARGS="-vv"
 	sh ./dev/run-gcs-server.sh
-	poetry run  pytest tests/ -m gcs ${PYTEST_ARGS}
+	uv run pytest tests/ -m gcs ${PYTEST_ARGS}
 
 test-coverage-unit: # Run test with coverage for unit tests, can add arguments with PYTEST_ARGS="-vv"
-	poetry run coverage run --source=pyiceberg/ --data-file=.coverage.unit -m pytest tests/ -v -m "(unmarked or parametrize) and not integration" ${PYTEST_ARGS}
+	uv run coverage run --source=pyiceberg/ --data-file=.coverage.unit -m pytest tests/ -v -m "(unmarked or parametrize) and not integration" ${PYTEST_ARGS}
 
 test-coverage-integration: # Run test with coverage for integration tests, can add arguments with PYTEST_ARGS="-vv"
 	docker compose -f dev/docker-compose-integration.yml kill
@@ -90,13 +90,13 @@ test-coverage-integration: # Run test with coverage for integration tests, can a
 	sleep 10
 	docker compose -f dev/docker-compose-integration.yml cp ./dev/provision.py spark-iceberg:/opt/spark/provision.py
 	docker compose -f dev/docker-compose-integration.yml exec -T spark-iceberg ipython ./provision.py
-	poetry run coverage run --source=pyiceberg/ --data-file=.coverage.integration -m pytest tests/ -v -m integration ${PYTEST_ARGS}
+	uv run coverage run --source=pyiceberg/ --data-file=.coverage.integration -m pytest tests/ -v -m integration ${PYTEST_ARGS}
 
 test-coverage: | test-coverage-unit test-coverage-integration ## Run all tests with coverage including unit and integration tests
-	poetry run coverage combine .coverage.unit .coverage.integration
-	poetry run coverage report -m --fail-under=90
-	poetry run coverage html
-	poetry run coverage xml
+	uv run coverage combine .coverage.unit .coverage.integration
+	uv run coverage report -m --fail-under=90
+	uv run coverage html
+	uv run coverage xml
 
 
 clean: ## Clean up the project Python working environment
@@ -110,10 +110,10 @@ clean: ## Clean up the project Python working environment
 	@echo "Cleanup complete"
 
 docs-install:
-	poetry install --with docs
+	uv sync --group docs
 
 docs-serve:
-	poetry run mkdocs serve -f mkdocs/mkdocs.yml
+	uv run mkdocs serve -f mkdocs/mkdocs.yml
 
 docs-build:
-	poetry run mkdocs build -f mkdocs/mkdocs.yml --strict
+	uv run mkdocs build -f mkdocs/mkdocs.yml --strict

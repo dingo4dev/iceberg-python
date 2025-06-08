@@ -51,13 +51,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Install poetry
-      run: make install-poetry
+    - name: Install uv
+      run: make install-uv
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python }}
-        cache: poetry
-        cache-dependency-path: ./poetry.lock
+        cache: pip
+        cache-dependency-path: ./uv.lock
     - name: Install system dependencies
       run: sudo apt-get update && sudo apt-get install -y libkrb5-dev # for kerberos
     - name: Install

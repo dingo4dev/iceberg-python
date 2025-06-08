@@ -34,33 +34,31 @@ For first-time contributors, feel free to check out our [good first issues](http
 
 The PyIceberg Project is hosted on GitHub at <https://github.com/apache/iceberg-python>.
 
-For the development, Poetry is used for packing and dependency management. You can install this using:
+For the development, uv is used for packing and dependency management. You can install this using:
 
 ```bash
-make install-poetry
+make install-uv
 ```
 
-To get started, you can run `make install`, which installs all the dependencies of the Iceberg library. This also installs the development dependencies. If you don't want to install the development dependencies, you need to install using `poetry install --without dev` instead of `make install`.
+To get started, you can run `make install`, which installs all the dependencies of the Iceberg library. This also installs the development dependencies. If you don't want to install the development dependencies, you need to install using `uv sync --no-dev` instead of `make install`.
 
-If you want to install the library on the host, you can simply run `pip3 install -e .`. If you wish to use a virtual environment, you can run `poetry shell`. Poetry will open up a virtual environment with all the dependencies set.
+If you want to install the library on the host, you can simply run `pip3 install -e .`. If you wish to use a virtual environment, you can run `uv venv` to create one and then activate it.
 
-> **Note:** If you want to use `poetry shell`, you need to install it using `pip install poetry-plugin-shell`. Alternatively, you can run commands directly with `poetry run`.
+> **Note:** You can run commands directly with `uv run` to execute them in the project environment.
 
-To set up IDEA with Poetry:
+To set up IDEA with uv:
 
 - Open up the Python project in IntelliJ
-- Make sure that you're on latest main (that includes Poetry)
+- Make sure that you're on latest main (that includes uv)
 - Go to File -> Project Structure (⌘;)
 - Go to Platform Settings -> SDKs
 - Click the + sign -> Add Python SDK
-- Select Poetry Environment from the left hand side bar and hit OK
+- Select the uv virtual environment from the project directory and hit OK
 - It can take some time to download all the dependencies based on your internet
 - Go to Project Settings -> Project
-- Select the Poetry SDK from the SDK dropdown, and click OK
+- Select the uv SDK from the SDK dropdown, and click OK
 
-For IDEA ≤2021 you need to install the [Poetry integration as a plugin](https://plugins.jetbrains.com/plugin/14307-poetry/).
-
-Now you're set using Poetry, and all the tests will run in Poetry, and you'll have syntax highlighting in the pyproject.toml to indicate stale dependencies.
+Now you're set using uv, and all the tests will run in uv, and you'll have dependency management through the pyproject.toml file.
 
 ## Installation from source
 

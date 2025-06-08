@@ -31,8 +31,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Install poetry
-        run: make install-poetry
+      - name: Install uv
+        run: make install-uv
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
