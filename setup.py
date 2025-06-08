@@ -16,13 +16,14 @@
 # under the License.
 
 import os
+from typing import Any, List
 
 from setuptools import Distribution, Extension, setup
 
 allowed_to_fail = os.environ.get("CIBUILDWHEEL", "0") != "1"
 
 
-def get_ext_modules():
+def get_ext_modules() -> List[Any]:
     """Build Cython extensions if available."""
     try:
         import Cython.Compiler.Options

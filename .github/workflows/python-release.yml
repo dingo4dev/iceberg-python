@@ -99,7 +99,7 @@ jobs:
 
       - name: Install uv
         run: make install-uv
-      
+
       - name: Install pyproject-parser
         run: uv tool install 'pyproject-parser[cli]'
 
