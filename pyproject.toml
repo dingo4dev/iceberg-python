@@ -143,9 +143,6 @@ disallow_any_generics = true
 disallow_untyped_defs = true
 implicit_reexport = false
 
-[[tool.mypy.overrides]]
-module = "pytest_mock.*"
-ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "pyarrow.*"
@@ -221,6 +218,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "gcsfs.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "huggingface_hub.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -300,7 +301,15 @@ module = "tenacity.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "pyiceberg_core.*"
+module = "polars.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "datafusion.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyroaring.*"
 ignore_missing_imports = true
 
 [tool.coverage.run]
