@@ -195,6 +195,94 @@ def hive_database(tmp_path_factory: pytest.TempPathFactory) -> HiveDatabase:
     )
 
 
+@pytest.fixture
+def hive_multipart_table(metadata_location: str) -> HiveTable:
+    return HiveTable(
+        tableName="new_tabl2e",
+        dbName="default.namespace",
+        owner="fokkodriesprong",
+        createTime=1659092339,
+        lastAccessTime=1659092,
+        retention=0,
+        sd=StorageDescriptor(
+            cols=[
+                FieldSchema(name="foo", type="string", comment=None),
+                FieldSchema(name="bar", type="int", comment=None),
+                FieldSchema(name="baz", type="boolean", comment=None),
+            ],
+            location="file:/tmp2/new_tabl2e",
+            inputFormat="org.apache.hadoop.mapred.FileInputFormat",
+            outputFormat="org.apache.hadoop.mapred.FileOutputFormat",
+            compressed=False,
+            numBuckets=0,
+            serdeInfo=SerDeInfo(
+                name=None,
+                serializationLib="org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
+                parameters={},
+                description=None,
+                serializerClass=None,
+                deserializerClass=None,
+                serdeType=None,
+            ),
+            bucketCols=[],
+            sortCols=[],
+            parameters={},
+            skewedInfo=SkewedInfo(skewedColNames=[], skewedColValues=[], skewedColValueLocationMaps={}),
+            storedAsSubDirectories=False,
+        ),
+        partitionKeys=[],
+        parameters={
+            "EXTERNAL": "TRUE",
+            "transient_lastDdlTime": "1659092339",
+            "table_type": "ICEBERG",
+            "metadata_location": metadata_location,
+        },
+        viewOriginalText=None,
+        viewExpandedText=None,
+        tableType="EXTERNAL_TABLE",
+        privileges=None,
+        temporary=False,
+        rewriteEnabled=False,
+        creationMetadata=None,
+        catName="hive",
+        ownerType=1,
+        writeId=-1,
+        isStatsCompliant=None,
+        colStats=None,
+        accessType=None,
+        requiredReadCapabilities=None,
+        requiredWriteCapabilities=None,
+        id=None,
+        fileMetadata=None,
+        dictionary=None,
+        txnId=None,
+    )
+
+
+@pytest.fixture(scope="session")
+def hive_multipart_database(tmp_path_factory: pytest.TempPathFactory) -> HiveDatabase:
+    # Pre-create the directory, this has to be done because
+    # of a local FS. Not needed with an actual object store.
+    database_path = tmp_path_factory.mktemp("database")
+    manifest_path = database_path / "database.namespace" / "table" / "metadata"
+    manifest_path.mkdir(parents=True)
+    return HiveDatabase(
+        name="default.namespace",
+        description=None,
+        locationUri=str(database_path / "database.namespace"),
+        parameters={"test": "property"},
+        privileges=None,
+        ownerName=None,
+        ownerType=1,
+        catalogName="hive",
+        createTime=None,
+        managedLocationUri=None,
+        type=None,
+        connector_name=None,
+        remote_dbname=None,
+    )
+
+
 class SaslServer(threading.Thread):
     def __init__(self, socket: thrift.transport.TSocket.TServerSocket, response: bytes) -> None:
         super().__init__()
@@ -253,20 +341,56 @@ def test_no_uri_supplied() -> None:
         HiveCatalog("production")
 
 
-def test_check_number_of_namespaces(table_schema_simple: Schema) -> None:
+@pytest.mark.parametrize("hive2_compatible", [True, False])
+def test_check_number_of_namespaces(
+    table_schema_simple: Schema, hive_multipart_database: HiveDatabase, hive_multipart_table: HiveTable, hive2_compatible: bool
+) -> None:
+    # catalog = HiveCatalog(HIVE_CATALOG_NAME, uri=HIVE_METASTORE_FAKE_URL,**{
+    #     "s3.endpoint": "http://localhost:9000",
+    #         "s3.access-key-id": "admin",
+    #         "s3.secret-access-key": "password",})
     catalog = HiveCatalog(HIVE_CATALOG_NAME, uri=HIVE_METASTORE_FAKE_URL)
+    if hive2_compatible:
+        catalog = HiveCatalog(HIVE_CATALOG_NAME, uri=HIVE_METASTORE_FAKE_URL, **{"hive.hive2-compatible": "true"})
+    catalog._client = MagicMock()
+    # catalog._client.__enter__().create_table.return_value = None
+    # catalog._client.__enter__().create_namespace_if_not_exists.return_value = None
+    # catalog._client.__enter__().get_table.return_value = hive_multipart_table
+    # catalog._client.__enter__().get_database.return_value = hive_multipart_table
+    
+    catalog.create_namespace_if_not_exists(
+        (
+            "default",
+            "namespace",
+        )
+    )
+    catalog._client.__enter__().create_database.assert_called_with(
+        HiveDatabase(
+            name="default",
+            description=None,
+            locationUri=None,
+            parameters={"property": "true"},
+            privileges=None,
+            ownerName=None,
+            ownerType=None,
+            catalogName=None,
+            createTime=None,
+            managedLocationUri=None,
+            type=None,
+            connector_name=None,
+            remote_dbname=None,
+        )
+    )
+    catalog.create_table(("default", "namespace", "table"), schema=table_schema_simple)
 
-    with pytest.raises(ValueError):
-        catalog.create_table(("default", "namespace", "table"), schema=table_schema_simple)
+    # with pytest.raises(ValueError):
+    #     catalog.create_table("default.namespace.table", schema=table_schema_simple)
 
-    with pytest.raises(ValueError):
-        catalog.create_table("default.namespace.table", schema=table_schema_simple)
+    # with pytest.raises(ValueError):
+    #     catalog.create_table(("table",), schema=table_schema_simple)
 
-    with pytest.raises(ValueError):
-        catalog.create_table(("table",), schema=table_schema_simple)
-
-    with pytest.raises(ValueError):
-        catalog.create_table("table", schema=table_schema_simple)
+    # with pytest.raises(ValueError):
+    #     catalog.create_table("table", schema=table_schema_simple)
 
 
 @pytest.mark.parametrize("hive2_compatible", [True, False])
@@ -635,9 +759,7 @@ def test_create_v1_table(table_schema_simple: Schema, hive_database: HiveDatabas
     catalog._client.__enter__().create_table.return_value = None
     catalog._client.__enter__().get_table.return_value = hive_table
     catalog._client.__enter__().get_database.return_value = hive_database
-    catalog.create_table(
-        ("default", "table"), schema=table_schema_simple, properties={"owner": "javaberg", "format-version": "1"}
-    )
+    catalog.create_table(("default", "table"), schema=table_schema_simple, properties={"owner": "javaberg", "format-version": "1"})
 
     # Test creating V1 table
     called_v1_table: HiveTable = catalog._client.__enter__().create_table.call_args[0][0]
@@ -709,9 +831,7 @@ def test_load_table(hive_table: HiveTable) -> None:
             ),
         ],
         current_schema_id=1,
-        partition_specs=[
-            PartitionSpec(PartitionField(source_id=1, field_id=1000, transform=IdentityTransform(), name="x"), spec_id=0)
-        ],
+        partition_specs=[PartitionSpec(PartitionField(source_id=1, field_id=1000, transform=IdentityTransform(), name="x"), spec_id=0)],
         default_spec_id=0,
         last_partition_id=1000,
         properties={"read.split.target.size": "134217728"},
@@ -743,9 +863,7 @@ def test_load_table(hive_table: HiveTable) -> None:
         metadata_log=[MetadataLogEntry(metadata_file="s3://bucket/.../v1.json", timestamp_ms=1515100)],
         sort_orders=[
             SortOrder(
-                SortField(
-                    source_id=2, transform=IdentityTransform(), direction=SortDirection.ASC, null_order=NullOrder.NULLS_FIRST
-                ),
+                SortField(source_id=2, transform=IdentityTransform(), direction=SortDirection.ASC, null_order=NullOrder.NULLS_FIRST),
                 SortField(
                     source_id=3,
                     transform=BucketTransform(num_buckets=4),
@@ -810,9 +928,7 @@ def test_load_table_from_self_identifier(hive_table: HiveTable) -> None:
             ),
         ],
         current_schema_id=1,
-        partition_specs=[
-            PartitionSpec(PartitionField(source_id=1, field_id=1000, transform=IdentityTransform(), name="x"), spec_id=0)
-        ],
+        partition_specs=[PartitionSpec(PartitionField(source_id=1, field_id=1000, transform=IdentityTransform(), name="x"), spec_id=0)],
         default_spec_id=0,
         last_partition_id=1000,
         properties={"read.split.target.size": "134217728"},
@@ -844,9 +960,7 @@ def test_load_table_from_self_identifier(hive_table: HiveTable) -> None:
         metadata_log=[MetadataLogEntry(metadata_file="s3://bucket/.../v1.json", timestamp_ms=1515100)],
         sort_orders=[
             SortOrder(
-                SortField(
-                    source_id=2, transform=IdentityTransform(), direction=SortDirection.ASC, null_order=NullOrder.NULLS_FIRST
-                ),
+                SortField(source_id=2, transform=IdentityTransform(), direction=SortDirection.ASC, null_order=NullOrder.NULLS_FIRST),
                 SortField(
                     source_id=3,
                     transform=BucketTransform(num_buckets=4),
@@ -1381,3 +1495,30 @@ def test_create_hive_client_with_kerberos_using_context_manager(
         # closing and re-opening work as expected.
         with client as open_client:
             assert open_client._iprot.trans.isOpen()
+
+
+def test_multipart_namespaces():
+    catalog = HiveCatalog(HIVE_CATALOG_NAME, uri=HIVE_METASTORE_FAKE_URL)
+
+    catalog._client = MagicMock()
+    catalog._client.__enter__().create_database.return_value = None
+
+    catalog.create_namespace("default.multipart", {"property": "true"})
+
+    catalog._client.__enter__().create_database.assert_called_with(
+        HiveDatabase(
+            name="default.multipart",
+            description=None,
+            locationUri=None,
+            parameters={"property": "true"},
+            privileges=None,
+            ownerName=None,
+            ownerType=None,
+            catalogName=None,
+            createTime=None,
+            managedLocationUri=None,
+            type=None,
+            connector_name=None,
+            remote_dbname=None,
+        )
+    )

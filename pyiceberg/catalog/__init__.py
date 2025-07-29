@@ -669,7 +669,7 @@ class Catalog(ABC):
         Returns:
             Identifier: a tuple of strings.
         """
-        return identifier if isinstance(identifier, tuple) else tuple(str.split(identifier, "."))
+        return identifier if isinstance(identifier, tuple) else tuple(str.rsplit(identifier, ".", maxsplit=1))
 
     @staticmethod
     def table_name_from(identifier: Union[str, Identifier]) -> str:
@@ -723,10 +723,10 @@ class Catalog(ABC):
         identifier: Union[str, Identifier], err: Union[Type[ValueError], Type[NoSuchNamespaceError]] = ValueError
     ) -> str:
         tuple_identifier = Catalog.identifier_to_tuple(identifier)
-        if len(tuple_identifier) != 1:
-            raise err(f"Invalid database, hierarchical namespaces are not supported: {identifier}")
+        # if len(tuple_identifier) != 1:
+        #     raise err(f"Invalid database, hierarchical namespaces are not supported: {identifier}")
 
-        return tuple_identifier[0]
+        return ".".join(tuple_identifier)
 
     @staticmethod
     def identifier_to_database_and_table(
@@ -734,10 +734,9 @@ class Catalog(ABC):
         err: Union[Type[ValueError], Type[NoSuchTableError], Type[NoSuchNamespaceError]] = ValueError,
     ) -> Tuple[str, str]:
         tuple_identifier = Catalog.identifier_to_tuple(identifier)
-        if len(tuple_identifier) != 2:
-            raise err(f"Invalid path, hierarchical namespaces are not supported: {identifier}")
-
-        return tuple_identifier[0], tuple_identifier[1]
+        # if len(tuple_identifier) != 2:
+        #     raise err(f"Invalid path, hierarchical namespaces are not supported: {identifier}")
+        return ".".join(tuple_identifier[:-1]), tuple_identifier[-1]
 
     def _load_file_io(self, properties: Properties = EMPTY_DICT, location: Optional[str] = None) -> FileIO:
         return load_file_io({**self.properties, **properties}, location)
@@ -954,6 +953,7 @@ class MetastoreCatalog(Catalog, ABC):
 
     @staticmethod
     def _write_metadata(metadata: TableMetadata, io: FileIO, metadata_path: str) -> None:
+        print(io.properties)
         ToOutputFile.table_metadata(metadata, io.new_output(metadata_path))
 
     @staticmethod
