@@ -21,10 +21,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from functools import cached_property, singledispatch
-from typing import Annotated, Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Annotated, Any, Dict, Generic, List, Optional, Set, Tuple, TypeVar, Union
 from urllib.parse import quote_plus
 
 from pydantic import (
+    AfterValidator,
     BeforeValidator,
     Field,
     PlainSerializer,
@@ -82,7 +83,7 @@ class PartitionField(IcebergBaseModel):
         PlainSerializer(lambda c: str(c), return_type=str),  # pylint: disable=W0108
         WithJsonSchema({"type": "string"}, mode="serialization"),
     ] = Field()
-    name: str = Field()
+    name: str | None = Field()
 
     def __init__(
         self,
@@ -245,9 +246,61 @@ class PartitionSpec(IcebergBaseModel):
         path = "/".join([field_str + "=" + value_str for field_str, value_str in zip(field_strs, value_strs)])
         return path
 
+    def bind(self, schema: Schema) -> BoundPartitionSpec:
+        """Bind the PartitionSpec to a specific schema."""
+        return BoundPartitionSpec(*self.fields, schema=schema, case_sensitive=True)
+
+
+class BoundPartitionSpec(PartitionSpec, IcebergBaseModel):
+    """BoundPartitionSpec is a PartitionSpec that is bound to a specific schema."""
+
+    schema: Schema = Field()
+    case_sensitive: bool = Field(default=True)
+    partition_names: Set[str] = Field(default_factory=set)
+
+    def __init__(self, *unbound_fields: PartitionField, schema: Schema, case_sensitive: bool = True, **data: Any):
+        data["schema"] = schema
+        self.case_sensitive = case_sensitive
+        fields = []
+        for unbound_field in unbound_fields:
+            if unbound_field.name is None:
+                name = _visit_partition_field(schema, unbound_field, visitor=_PartitionNameGenerator())
+                fields.append(unbound_field.copy(update={"name":name}))
+            else:
+                fields.append(unbound_field)
+        super().__init__(*fields, **data)
+
+    def partition_type(self) -> StructType:
+        return super().partition_type(self.schema)
+
+    def partition_to_path(self, data: Record) -> str:
+        return super().partition_to_path(data, self.schema)
+    
+    def _check_and_add_partition_name(self, name: str, source_id: int) -> None:
+        try:
+            field = self.schema.find_field(name)
+        except ValueError:
+            field = None
+
+        if source_id is not None and field is not None and field.field_id != source_id:
+            raise ValueError(f"Cannot create identity partition from a different field in the schema {name}")
+        elif field is not None and source_id != field.field_id:
+            raise ValueError(f"Cannot create partition from name that exists in schema {name}")
+        if not name:
+            raise ValueError("Undefined name")
+        if name in self.partition_names:
+            raise ValueError(f"Partition name has to be unique: {name}")
+        self.partition_names.add(name)
+
+    def _check_partition_spec(self):
+        """Check that all partition field names are valid."""        
+        for partition_field in self.fields:
+            name = partition_field.name
+            source_id = partition_field.source_id
+            self._check_and_add_partition_name(name, source_id)
+
 
 UNPARTITIONED_PARTITION_SPEC = PartitionSpec(spec_id=0)
-
 
 def assign_fresh_partition_spec_ids(spec: PartitionSpec, old_schema: Schema, fresh_schema: Schema) -> PartitionSpec:
     partition_fields = []
@@ -260,7 +313,9 @@ def assign_fresh_partition_spec_ids(spec: PartitionSpec, old_schema: Schema, fre
             raise ValueError(f"Could not find field in fresh schema: {original_column_name}")
         partition_fields.append(
             PartitionField(
-                name=field.name,
+                name=_visit_partition_field(fresh_schema, field=field, visitor=_PartitionNameGenerator())
+                if field.name is None
+                else field.name,
                 source_id=fresh_field.field_id,
                 field_id=PARTITION_FIELD_ID_START + pos,
                 transform=field.transform,

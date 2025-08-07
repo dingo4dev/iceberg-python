@@ -95,6 +95,7 @@ def check_partition_specs(table_metadata: TableMetadata) -> TableMetadata:
     partition_specs: List[PartitionSpec] = table_metadata.partition_specs
     for spec in partition_specs:
         if spec.spec_id == default_spec_id:
+            spec.bind(table_metadata.schema())
             return table_metadata
 
     raise ValidationError(f"default-spec-id {default_spec_id} can't be found")
