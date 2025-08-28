@@ -40,8 +40,8 @@ from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional
 import boto3
 import pytest
 from moto import mock_aws
-from sqlalchemy import Connection
 from pydantic_core import to_json
+from sqlalchemy import Connection
 
 from pyiceberg.catalog import Catalog, load_catalog
 from pyiceberg.catalog.noop import NoopCatalog
